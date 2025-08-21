@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "commonjs",            // or "esnext" to match your build
+    "target": "es2019",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true             // optional but avoids 3rd‑party typing noise
+  }
+}

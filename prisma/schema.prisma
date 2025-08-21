@@ -1,0 +1,353 @@
+// ================== CONFIG ==================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ================== ENUMS ==================
+enum EmployerStatus {
+  draft
+  active
+  suspended
+  archived
+  @@map("employer_status")
+}
+
+enum CompanySize {
+  S1_10        @map("1-10")
+  S11_50       @map("11-50")
+  S51_200      @map("51-200")
+  S201_500     @map("201-500")
+  S501_1000    @map("501-1000")
+  S1001_5000   @map("1001-5000")
+  S5001_10000  @map("5001-10000")
+  S10000_PLUS  @map("10000+")
+  @@map("company_size")
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+  @@map("verification_status")
+}
+
+enum OnboardingStep {
+  PACKAGE
+  JOB
+  VERIFY
+  DONE
+  @@map("onboarding_step")
+}
+
+// ================== AUTH MODELS ==================
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  photoUrl     String?
+  cvUrl        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt @default(now())
+
+  // Relations
+  sessions     Session[]
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt @default(now())
+}
+
+// ================== EMPLOYER MODELS ==================
+model Employer {
+  id             String               @id @default(uuid()) @db.Uuid
+  slug           String               @unique
+  legalName      String               @map("legal_name")
+  displayName    String               @map("display_name")
+  website        String?
+  status         EmployerStatus       @default(draft)
+  isVerified     Boolean              @default(false)        @map("is_verified")
+  onboardingStep OnboardingStep       @default(PACKAGE)      @map("onboarding_step")
+  createdAt      DateTime             @default(now())        @db.Timestamptz(6) @map("created_at")
+  updatedAt      DateTime             @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  profile        EmployerProfile?
+  admins         EmployerAdminUser[]
+  offices        EmployerOffice[]
+  contacts       EmployerContact[]
+  metas          EmployerMeta[]
+  subscriptions  Subscription[]
+  jobs           Job[]
+  verifications  VerificationRequest[]
+  payments       Payment[]            // rel pembayaran
+
+  // Sessions (siapa login dengan employer aktif tersebut)
+  sessions       Session[]
+
+  @@map("employers")
+}
+
+model EmployerProfile {
+  id           String    @id @default(uuid()) @db.Uuid
+  employerId   String    @unique @db.Uuid     @map("employer_id")
+  industry     String?
+  size         CompanySize?
+  foundedYear  Int?                              @map("founded_year")
+  about        String?
+  logoUrl      String?                           @map("logo_url")
+  bannerUrl    String?                           @map("banner_url")
+  hqCity       String?                           @map("hq_city")
+  hqCountry    String?                           @map("hq_country")
+  linkedin     String?
+  twitter      String?
+  instagram    String?
+  createdAt    DateTime  @default(now())         @db.Timestamptz(6) @map("created_at")
+  updatedAt    DateTime  @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer     Employer  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@map("employer_profiles")
+}
+
+model EmployerAdminUser {
+  id           String    @id @default(uuid()) @db.Uuid
+  employerId   String    @db.Uuid            @map("employer_id")
+  email        String    @unique
+  passwordHash String                         @map("password_hash")
+  fullName     String?                        @map("full_name")
+  phone        String?
+  isOwner      Boolean   @default(true)       @map("is_owner")
+  agreedTosAt  DateTime?                      @map("agreed_tos_at")
+  createdAt    DateTime  @default(now())      @db.Timestamptz(6) @map("created_at")
+  updatedAt    DateTime  @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer     Employer  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([employerId])
+  @@map("employer_admin_users")
+}
+
+model EmployerOffice {
+  id          String   @id @default(uuid()) @db.Uuid
+  employerId  String   @db.Uuid            @map("employer_id")
+  label       String?
+  address1    String?                       @map("address1")
+  address2    String?                       @map("address2")
+  city        String?
+  state       String?
+  postalCode  String?                       @map("postal_code")
+  country     String?
+  lat         Float?
+  lng         Float?
+  isRemoteHub Boolean  @default(false)      @map("is_remote_hub")
+  createdAt   DateTime @default(now())      @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([employerId])
+  @@map("employer_offices")
+}
+
+model EmployerContact {
+  id          String   @id @default(uuid()) @db.Uuid
+  employerId  String   @db.Uuid            @map("employer_id")
+  fullName    String                        @map("full_name")
+  role        String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean  @default(false)      @map("is_primary")
+  createdAt   DateTime @default(now())      @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([employerId])
+  @@map("employer_contacts")
+}
+
+model EmployerMeta {
+  id          String  @id @default(uuid()) @db.Uuid
+  employerId  String  @db.Uuid            @map("employer_id")
+  key         String
+  value       String?
+
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@unique([employerId, key])
+  @@map("employer_meta")
+}
+
+// ================== BILLING MODELS ==================
+model Plan {
+  id       String  @id @default(uuid()) @db.Uuid
+  slug     String  @unique
+  name     String
+  description String?
+  amount   BigInt  @db.BigInt
+  currency String  @default("IDR")
+  interval String  @default("month")
+  active   Boolean @default(true)
+  priceId  String?
+
+  payments      Payment[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String    @id @default(uuid()) @db.Uuid
+  employerId           String    @db.Uuid            @map("employer_id")
+  planId               String    @db.Uuid            @map("plan_id")
+  providerId           String?                       @map("provider_id")
+  status               String    @default("active")
+  currentPeriodStart   DateTime?                     @map("current_period_start")
+  currentPeriodEnd     DateTime?                     @map("current_period_end")
+  createdAt            DateTime  @default(now())     @db.Timestamptz(6) @map("created_at")
+  updatedAt            DateTime  @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer             Employer  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  plan                 Plan      @relation(fields: [planId], references: [id])
+  items                SubscriptionItem[]
+
+  @@index([employerId])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  subscriptionId   String        @db.Uuid            @map("subscription_id")
+  name             String
+  quantity         Int           @default(1)
+  metadata         Json?
+
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@map("subscription_items")
+}
+
+/** ============== Payment (Midtrans) ============== */
+model Payment {
+  id            String   @id @default(uuid()) @db.Uuid
+  orderId       String   @unique              @map("order_id")
+  planId        String?  @db.Uuid             @map("plan_id")
+  employerId    String?  @db.Uuid             @map("employer_id")
+  userId        String?
+
+  currency      String   @default("IDR")
+  grossAmount   BigInt                       @map("gross_amount")
+  method        String?
+  status        String   @default("pending")
+  transactionId String?                      @map("transaction_id")
+  fraudStatus   String?                      @map("fraud_status")
+
+  token         String?                      @map("token")
+  redirectUrl   String?                      @map("redirect_url")
+
+  meta          Json?
+
+  createdAt     DateTime @default(now())     @db.Timestamptz(6) @map("created_at")
+  updatedAt     DateTime @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  plan          Plan?     @relation(fields: [planId], references: [id])
+  employer      Employer? @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([employerId])
+  @@map("payments")
+}
+
+// ================== JOBS ==================
+model Job {
+  id          String   @id @default(uuid()) @db.Uuid
+  employerId  String   @db.Uuid            @map("employer_id")
+  title       String
+  description String?
+  location    String?
+  employment  String?
+  isDraft     Boolean  @default(true)       @map("is_draft")
+  isActive    Boolean  @default(false)      @map("is_active")
+  createdAt   DateTime @default(now())      @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime @updatedAt @default(now()) @db.Timestamptz(6) @map("updated_at")
+
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@index([employerId, isActive])
+  @@map("jobs")
+}
+
+// ================== VERIFICATION ==================
+model VerificationRequest {
+  id         String             @id @default(uuid()) @db.Uuid
+  employerId String             @db.Uuid            @map("employer_id")
+  status     VerificationStatus @default(pending)
+  note       String?
+  createdAt  DateTime           @default(now())     @db.Timestamptz(6) @map("created_at")
+  reviewedAt DateTime?                              @map("reviewed_at")
+
+  employer   Employer           @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  files      VerificationFile[]
+  tokens     VerifyToken[]
+
+  @@index([employerId, status])
+  @@map("verification_requests")
+}
+
+model VerificationFile {
+  id             String              @id @default(uuid()) @db.Uuid
+  verificationId String              @db.Uuid            @map("verification_id")
+  fileUrl        String                                   @map("file_url")
+  fileType       String?                                  @map("file_type")
+  uploadedAt     DateTime            @default(now())      @db.Timestamptz(6) @map("uploaded_at")
+
+  verification   VerificationRequest  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@map("verification_files")
+}
+
+model VerifyToken {
+  id             String              @id @default(uuid()) @db.Uuid
+  verificationId String              @db.Uuid            @map("verification_id")
+  type           String
+  token          String              @unique
+  expiresAt      DateTime                                 @map("expires_at")
+  usedAt         DateTime?                                @map("used_at")
+
+  verification   VerificationRequest  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@map("verify_tokens")
+}
+
+// ================== SESSIONS ==================
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // employer aktif saat sesi dibuat (opsional)
+  employerId  String?   @db.Uuid
+  employer    Employer? @relation(fields: [employerId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())     @db.Timestamptz(6)
+  expiresAt   DateTime                      @db.Timestamptz(6)
+  lastSeenAt  DateTime  @default(now())     @db.Timestamptz(6)
+  ip          String?
+  userAgent   String?
+  revokedAt   DateTime?
+
+  @@index([userId])
+  @@index([employerId])
+  @@index([revokedAt])
+  @@map("sessions")
+}
