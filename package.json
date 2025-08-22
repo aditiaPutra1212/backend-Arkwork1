@@ -5,10 +5,10 @@
   "license": "MIT",
   "private": true,
   "main": "dist/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsup src/index.ts --format=cjs --platform=node --target=node18 --sourcemap --minify --out-dir dist --clean --splitting=false --shims --external @prisma/client --external prisma",
+    "build": "tsup src/index.ts --format=esm --platform=node --target=node20 --sourcemap --minify --out-dir dist --clean --splitting=false --external @prisma/client --external prisma",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
@@ -39,6 +39,7 @@
   },
   "devDependencies": {
     "@types/cookie": "^0.6.0",
+    "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.23",
     "@types/jsonwebtoken": "^9.0.10",
@@ -50,7 +51,6 @@
     "typescript": "^5.4.0"
   },
   "engines": {
-    "node": "18.x || 20.x"
+    "node": "20.x || 18.x"
   }
 }
-  
